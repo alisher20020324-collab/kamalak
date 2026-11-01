@@ -7,7 +7,7 @@ const DB_NAME = process.env.MONGODB_DB || 'kamalak';
 export const client = new MongoClient(URI, { serverSelectionTimeoutMS: 5000 });
 
 // Kolleksiyalar: C.users, C.moods ... (connect() dan keyin to'ladi)
-const NAMES = ['counters', 'classes', 'users', 'moods', 'goals', 'assessments', 'tasks', 'submissions', 'badges', 'notes', 'chats'];
+const NAMES = ['counters', 'classes', 'users', 'moods', 'goals', 'assessments', 'tasks', 'submissions', 'badges', 'notes', 'chats', 'voices'];
 export const C = {};
 export let db = null;
 

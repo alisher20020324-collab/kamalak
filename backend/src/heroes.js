@@ -254,6 +254,25 @@ export const HEROES = {
 };
 
 // Avvalgi versiyadagi qahramon id lari (bazadagi eski suhbatlar uchun)
+// Qahramonlar ovozi: bepul o'zbekcha ovozlar, har biriga o'z balandligi (pitch) va tezligi (rate)
+const SARDOR = 'uz-UZ-SardorNeural';
+const MADINA = 'uz-UZ-MadinaNeural';
+export const VOICES = {
+  po: { name: SARDOR, pitch: '-5Hz', rate: '+8%' },
+  shifu: { name: SARDOR, pitch: '-12Hz', rate: '-15%' },
+  judi: { name: MADINA, pitch: '+10Hz', rate: '+8%' },
+  nik: { name: SARDOR, pitch: '+4Hz', rate: '-3%' },
+  olaf: { name: SARDOR, pitch: '+25Hz', rate: '+10%' },
+  shrek: { name: SARDOR, pitch: '-25Hz', rate: '-8%' },
+  mater: { name: SARDOR, pitch: '-8Hz', rate: '+12%' },
+  wade: { name: SARDOR, pitch: '+12Hz', rate: '-5%' },
+  ember: { name: MADINA, pitch: '-6Hz', rate: '+5%' },
+  anxiety: { name: MADINA, pitch: '+15Hz', rate: '+22%' },
+  anger: { name: SARDOR, pitch: '-30Hz', rate: '+10%' },
+  alex: { name: SARDOR, pitch: '-4Hz', rate: '+5%' },
+  mirabel: { name: MADINA, pitch: '+5Hz', rate: '+5%' },
+};
+
 export const LEGACY_IDS = { bambuk: 'po', boyogli: 'shifu', quyonjon: 'judi', tulkivoy: 'nik', ajdarcha: 'olaf', ayiqvoy: 'shrek' };
 
 export const SKIP_REPLY = "Mayli, bu savolni o'tkazib yuboramiz 🙂";

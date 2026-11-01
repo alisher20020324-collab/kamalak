@@ -15,6 +15,29 @@ export default function StudentChat() {
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState('');
   const logRef = useRef(null);
+  const [recording, setRecording] = useState(false);
+  const recRef = useRef(null);
+  const audioRef = useRef(null);
+  const voices = useRef(new Map()); // matn -> ovoz (object URL), qayta so'ramaslik uchun
+
+  // Qahramon ovozi: matnni uning ovozida o'qiydi. Ovoz bo'lmasa yoki brauzer bloklasa — jim
+  const voiceOf = (heroId, text) => {
+    const key = `${heroId}:${text}`;
+    if (!voices.current.has(key)) {
+      voices.current.set(key, api('/student/tts', { method: 'POST', body: { hero: heroId, text }, as: 'blob' })
+        .then((b) => (b ? URL.createObjectURL(b) : null))
+        .catch(() => null));
+    }
+    return voices.current.get(key);
+  };
+  const stopAudio = () => audioRef.current?.pause();
+  const play = async (url) => {
+    if (!url) return;
+    stopAudio();
+    audioRef.current = new Audio(url);
+    audioRef.current.play().catch(() => {});
+  };
+  useEffect(() => () => { stopAudio(); recRef.current?.state === 'recording' && recRef.current.stop(); }, []);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
@@ -25,13 +48,16 @@ export default function StudentChat() {
 
   const push = (from, t) => setMsgs((m) => [...m, { from, text: t }]);
   // Qahramon "yozayotgandek" bir oz kutib javob beradi
-  const heroSays = async (...lines) => {
-    for (const l of lines.filter(Boolean)) {
+  const heroSays = async (heroId, ...lines) => {
+    lines = lines.filter(Boolean);
+    const audio = lines.length ? voiceOf(heroId, lines.join(' ')) : null; // ovoz parallel tayyorlanadi
+    for (const l of lines) {
       setTyping(true);
       await wait(650);
       setTyping(false);
       push('hero', l);
     }
+    play(await audio);
   };
 
   const pickMood = async (mood) => {
@@ -51,7 +77,7 @@ export default function StudentChat() {
       setChat(c);
       setMsgs([]);
       setStage('chat');
-      await heroSays(c.hello, c.question);
+      await heroSays(c.hero.id, c.hello, c.question);
     } catch (e) {
       toast(e.message);
     }
@@ -64,18 +90,62 @@ export default function StudentChat() {
     try {
       const r = await api(`/student/chats/${chat.id}/answer`, { method: 'POST', body: { answer: value } });
       setChat({ ...chat, step: r.step, done: r.done });
-      await heroSays(r.reply, r.question, r.bye);
+      await heroSays(chat.hero.id, r.reply, r.question, r.bye);
     } catch (e) {
       toast(e.message);
     }
   };
+
+  // ----- Ovozli javob: bosib gapiradi, yana bosganda yuboriladi -----
+  const sendVoice = async (blob) => {
+    setMsgs((m) => [...m, { from: 'me', text: '🎤 ...', pending: true }]);
+    setTyping(true);
+    try {
+      const r = await api(`/student/chats/${chat.id}/voice`, { method: 'POST', raw: blob });
+      setMsgs((m) => m.map((x) => (x.pending ? { from: 'me', text: `🎤 «${r.heard}»` } : x)));
+      setTyping(false);
+      setChat((c) => ({ ...c, step: r.step, done: r.done }));
+      await heroSays(chat.hero.id, r.reply, r.question, r.bye);
+    } catch (e) {
+      setMsgs((m) => m.filter((x) => !x.pending));
+      setTyping(false);
+      toast(e.message);
+    }
+  };
+
+  const startRec = async () => {
+    if (typing || chat.done) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return toast("Bu brauzerda ovoz yozib bo'lmaydi 🙈");
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      return toast('🎤 Mikrofonga ruxsat bering');
+    }
+    stopAudio();
+    const rec = new MediaRecorder(stream);
+    const chunks = [];
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setRecording(false);
+      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      if (blob.size > 2000) sendVoice(blob);
+      else toast("Ovoz juda qisqa — tugmani bosib, gapirib, keyin yana bos");
+    };
+    rec.start();
+    recRef.current = rec;
+    setRecording(true);
+    setTimeout(() => rec.state === 'recording' && rec.stop(), 60_000); // ko'pi bilan 1 daqiqa
+  };
+  const stopRec = () => recRef.current?.state === 'recording' && recRef.current.stop();
 
   const finish = async () => {
     if (typing) return;
     try {
       const r = await api(`/student/chats/${chat.id}/finish`, { method: 'POST' });
       setChat({ ...chat, done: true });
-      await heroSays(r.bye);
+      await heroSays(chat.hero.id, r.bye);
     } catch (e) {
       toast(e.message);
     }
@@ -130,7 +200,13 @@ export default function StudentChat() {
 
       <div className="chat-log" ref={logRef}>
         {msgs.map((m, i) => (
-          <div key={i} className={`bubble ${m.from}`}>{m.text}</div>
+          m.from === 'hero' ? (
+            <button key={i} type="button" className="bubble hero" title="Yana eshitish" onClick={async () => play(await voiceOf(hero.id, m.text))}>
+              {m.text} <span className="say">🔊</span>
+            </button>
+          ) : (
+            <div key={i} className={`bubble ${m.from}`}>{m.text}</div>
+          )
         ))}
         {typing && <div className="bubble hero typing"><span /><span /><span /></div>}
       </div>
@@ -147,12 +223,20 @@ export default function StudentChat() {
             rows={2}
             maxLength={500}
             value={text}
-            placeholder="Javobingni shu yerga yoz..."
+            placeholder="...yoki javobingni shu yerga yoz"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (text.trim()) answer(text.trim()); } }}
           />
+          <button
+            type="button"
+            className={`btn mic ${recording ? 'coral rec' : 'grape'}`}
+            disabled={typing && !recording}
+            onClick={recording ? stopRec : startRec}
+          >
+            {recording ? '⏹ Tugatdim — yuborish' : '🎤 Gapirib javob berish'}
+          </button>
           <div className="row" style={{ gap: 8 }}>
-            <button className="btn mint" disabled={typing || !text.trim()}>📨 Yuborish</button>
+            <button className="btn mint" disabled={typing || recording || !text.trim()}>📨 Yuborish</button>
             <button type="button" className="btn ghost" disabled={typing} onClick={() => answer('')}>⏭ O'tkazib yuborish</button>
           </div>
         </form>

@@ -13,13 +13,19 @@ export function setToken(t) {
 const cache = new Map();
 export const clearCache = () => cache.clear();
 
-export async function api(path, { method = 'GET', body } = {}) {
+// raw — JSON emas, fayl yuborish (masalan, ovoz Blob); as: 'blob' — javobni fayl sifatida olish (204 bo'lsa null)
+export async function api(path, { method = 'GET', body, raw, as } = {}) {
   const token = getToken();
   const res = await fetch('/api' + path, {
     method,
-    headers: { ...(body && { 'Content-Type': 'application/json' }), ...(token && { Authorization: `Bearer ${token}` }) },
-    body: body && JSON.stringify(body),
+    headers: {
+      ...(body && { 'Content-Type': 'application/json' }),
+      ...(raw && { 'Content-Type': raw.type || 'application/octet-stream' }),
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: raw ?? (body && JSON.stringify(body)),
   });
+  if (as === 'blob' && res.ok) return res.status === 204 ? null : res.blob();
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && token) {
     setToken(null);

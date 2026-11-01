@@ -78,22 +78,33 @@ const clean = (text) => {
 
 export const aiEnabled = () => Boolean(process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY);
 
-export async function aiQuestion({ hero, mood, history, topic, step, total }) {
+// Gemini → Groq tartibida so'raydi; parse null qaytarsa keyingisiga o'tadi
+async function ask(system, user, parse, what, order = [['Gemini', gemini], ['Groq', groq]]) {
   if (!aiEnabled()) return null;
-  const system = SYSTEM(hero, total);
-  const user = USER({ mood, history, topic, step, total });
-  for (const [name, fn] of [['Gemini', gemini], ['Groq', groq]]) {
+  for (const [name, fn] of order) {
     if (Date.now() < pausedUntil[name]) continue;
     try {
-      const q = clean(await fn(system, user));
-      if (q) return q;
+      const out = parse(await fn(system, user));
+      if (out != null) return out;
     } catch (e) {
       // Bepul limit tugasa (429), bu xizmatni bir daqiqa chaqirmaymiz — bola kutib qolmasin
       if (e.message.endsWith(' 429')) pausedUntil[name] = Date.now() + 60_000;
-      console.warn(`⚠️ ${name} savol tuza olmadi: ${e.message}`);
+      console.warn(`⚠️ ${name} ${what}: ${e.message}`);
     }
   }
   return null;
 }
+
+export const aiQuestion = ({ hero, mood, history, topic, step, total }) =>
+  ask(SYSTEM(hero, total), USER({ mood, history, topic, step, total }), clean, 'savol tuza olmadi');
+
+// Ovozdan olingan matnda so'zlar buzilib yozilishi mumkin ("urdi" → "orde"), so'z ro'yxati topa olmaydi.
+// Shuning uchun ovozli javobni AI ham tekshiradi. Groq birinchi — tezroq.
+const ALARM_SYSTEM = `Sen boshlang'ich sinf o'quvchisi javoblarini tekshiruvchi xavfsizlik filtrisan.
+Matn o'zbekcha nutqdan avtomatik yozib olingan, so'zlar buzilgan bo'lishi mumkin ("orde" = "urdi", "karkaman" = "qo'rqaman").
+Agar bola zo'ravonlik (urish, kaltaklash), haqorat yoki masxara qilinish, qo'rquv, yolg'izlik, och qolish yoki o'ziga zarar yetkazish haqida gapirsa — "HA", aks holda "YO'Q" deb yoz. Faqat bitta so'z.`;
+
+export const aiAlarm = (text) =>
+  ask(ALARM_SYSTEM, String(text), (out) => (/^\s*ha\b/i.test(out || '') ? true : /yo.?q/i.test(out || '') ? false : null), 'xavfsizlik tekshiruvi', [['Groq', groq], ['Gemini', gemini]]);
 
 const pausedUntil = { Gemini: 0, Groq: 0 };

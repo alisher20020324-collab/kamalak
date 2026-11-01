@@ -15,6 +15,9 @@ const signToken = (user) => jwt.sign({ id: user.id, role: user.role }, JWT_SECRE
 
 // Async xatolarni bitta joyda ushlash
 const h = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((data) => res.json(data ?? { ok: true }), next);
+// Ovoz qaytaradigan yo'llar uchun: { mime, data } yoki null (ovoz yo'q — 204)
+const audio = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req)).then((a) => (a ? res.type(a.mime).set('Cache-Control', 'private, max-age=86400').send(a.data) : res.status(204).end()), next);
 
 function auth(role) {
   return async (req, res, next) => {
@@ -104,6 +107,13 @@ export function createApp() {
   st.get('/heroes', h((req) => S.chatHeroes(req.user.id)));
   st.post('/chats', h((req) => S.startChat(req.user.id, req.body?.hero)));
   st.post('/chats/:id/answer', h((req) => S.answerChat(req.user.id, Number(req.params.id), req.body?.answer)));
+  st.post('/chats/:id/voice', express.raw({ type: ['audio/*', 'video/webm', 'application/octet-stream'], limit: '5mb' }), h((req) =>
+    S.answerChatVoice(req.user.id, Number(req.params.id), Buffer.isBuffer(req.body) ? req.body : null, req.get('content-type'))));
+  // Qahramon gapini uning ovozida qaytaradi (MP3)
+  st.post('/tts', audio(async (req) => {
+    const data = await S.heroSpeech(req.body?.hero, String(req.body?.text || '').slice(0, 800));
+    return data && { mime: 'audio/mpeg', data };
+  }));
   st.post('/chats/:id/finish', h((req) => S.finishChat(req.user.id, Number(req.params.id))));
   api.use('/student', st);
 
@@ -120,6 +130,7 @@ export function createApp() {
   te.delete('/tasks/:id', h((req) => S.deleteTask(req.user.id, Number(req.params.id))));
   te.get('/tasks/:id/submissions', h((req) => S.taskSubmissions(req.user.id, Number(req.params.id))));
   te.post('/submissions/:id/review', h((req) => S.reviewSubmission(req.user.id, Number(req.params.id), req.body || {})));
+  te.get('/voices/:id', audio((req) => S.getVoice(req.user.id, Number(req.params.id))));
   te.get('/chats', h((req) => S.classChats(req.user.id, { flagged: req.query.flagged === '1' })));
   api.use('/teacher', te);
 

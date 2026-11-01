@@ -12,7 +12,7 @@ O'quvchi va o'qituvchi uchun veb-sayt + Telegram bot. Ikkalasi bitta bazadan foy
 
 ## Imkoniyatlar
 
-**Qahramon bilan suhbat:** o'quvchi avval kayfiyatini belgilaydi, keyin 13 ta qahramondan birini tanlaydi (🐼 Po, 🥋 Ustoz Shifu, 🐰 Judi, 🦊 Nik, ⛄ Olaf, 🧅 Shrek, 🛻 Meyter, 💧 Ueyd, 🔥 Ember, 😬 Xavotir, 😡 Jahl, 🦁 Aleks, 🦋 Mirabel). Rasmlar `frontend/public/heroes/` papkasida; obrazlar DreamWorks, Disney va Pixar'ga tegishli, shuning uchun platforma maktab ichida ishlatilishi kerak. Qahramon 8 ta savol beradi: bugungi kun, kayfiyat sababi, maktab, do'stlar, oila, his-tuyg'ular, qobiliyat va orzular haqida. Birinchi savol bolaning kayfiyatiga moslashadi. Keyingi savollarni AI (avval Gemini, u ishlamasa Groq) bolaning javoblariga qarab, shu mavzular doirasida tuzadi; kalit berilmagan yoki AI javob bermagan bo'lsa, tayyor savollar beriladi. Xavotirli javobdan keyin AI chaqirilmaydi. Javoblarni faqat o'z o'qituvchisi ko'radi. Zo'ravonlik, qo'rquv yoki o'ziga zarar haqidagi so'zlar topilsa, o'qituvchiga Telegramda darhol 🔴 ogohlantirish boradi. Savollar va xavotirli so'zlar ro'yxati `backend/src/heroes.js` faylida.
+**Qahramon bilan suhbat:** o'quvchi avval kayfiyatini belgilaydi, keyin 13 ta qahramondan birini tanlaydi (🐼 Po, 🥋 Ustoz Shifu, 🐰 Judi, 🦊 Nik, ⛄ Olaf, 🧅 Shrek, 🛻 Meyter, 💧 Ueyd, 🔥 Ember, 😬 Xavotir, 😡 Jahl, 🦁 Aleks, 🦋 Mirabel). Rasmlar `frontend/public/heroes/` papkasida; obrazlar DreamWorks, Disney va Pixar'ga tegishli, shuning uchun platforma maktab ichida ishlatilishi kerak. Qahramon 8 ta savol beradi: bugungi kun, kayfiyat sababi, maktab, do'stlar, oila, his-tuyg'ular, qobiliyat va orzular haqida. Birinchi savol bolaning kayfiyatiga moslashadi. Keyingi savollarni AI (avval Gemini, u ishlamasa Groq) bolaning javoblariga qarab, shu mavzular doirasida tuzadi; kalit berilmagan yoki AI javob bermagan bo'lsa, tayyor savollar beriladi. Xavotirli javobdan keyin AI chaqirilmaydi. **Ovoz:** 1-2-sinflar uchun qahramon har bir gapini o'z ovozida aytadi (bepul o'zbekcha ovozlar Sardor/Madina, har bir qahramonga o'z balandligi va tezligi — `backend/src/heroes.js` dagi `VOICES`; asl multfilm ovozlari aktyorlarga tegishli bo'lgani uchun nusxalanmaydi). Bola saytda 🎤 tugmasi yoki Telegram'da ovozli xabar bilan javob bera oladi: ovoz Groq Whisper orqali matnga aylanadi, xavotirli so'zlar so'z ro'yxati va AI bilan tekshiriladi, asl ovoz saqlanadi va o'qituvchi uni «Suhbatlar» bo'limida ▶️ tugmasi bilan eshitadi. Javoblarni faqat o'z o'qituvchisi ko'radi. Zo'ravonlik, qo'rquv yoki o'ziga zarar haqidagi so'zlar topilsa, o'qituvchiga Telegramda darhol 🔴 ogohlantirish boradi. Savollar va xavotirli so'zlar ro'yxati `backend/src/heroes.js` faylida.
 
 **O'quvchi:** kunlik kayfiyat kundaligi (izoh bilan) · shaxsiy maqsadlar va foiz bilan bajarilishi · «Men qandayman?»: 5 ta sifat bo'yicha o'zini baholash, natija diagrammada ko'rinadi · topshiriqlarni bajarish va yulduz yig'ish · nishonlar va darajalar.
 
@@ -49,6 +49,9 @@ GEMINI_API_KEY=...   # https://aistudio.google.com/apikey
 GROQ_API_KEY=...     # https://console.groq.com/keys
 ```
 Model nomini `GEMINI_MODEL` / `GROQ_MODEL` bilan o'zgartirish mumkin (standart: `gemini-3.6-flash`, `openai/gpt-oss-120b`).
+
+### Ovozni yoqish
+Qahramon ovozi uchun Python va edge-tts kerak: `pip install edge-tts` (`python` buyrug'i PATH'da bo'lsin, boshqa joyda bo'lsa `TTS_PYTHON=` ga yo'lini yozing; `TTS_PYTHON=off` — ovoz o'chiq). Ovozlar `backend/data/tts/` papkasida keshlanadi. Bolaning ovozini matnga aylantirish uchun `GROQ_API_KEY` kerak.
 
 ### Telegram botni yoqish
 1. Telegramda [@BotFather](https://t.me/BotFather) → `/newbot` → token oling.

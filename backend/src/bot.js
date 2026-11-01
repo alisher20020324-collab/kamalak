@@ -208,16 +208,31 @@ export function createBot(token, { siteUrl = 'http://localhost:7000' } = {}) {
   const askQuestion = (ctx, text, step, total) =>
     ctx.reply(`<i>${step + 1}/${total}</i>  ${esc(text)}`, { parse_mode: 'HTML', ...CHAT_KEYS });
 
-  async function answerHero(ctx, user, text) {
+  // Qahramon gapini uning ovozida ham yuboradi (kichik sinflar o'qishda qiynaladi). Ovoz bo'lmasa — jim o'tkaziladi
+  async function heroVoice(ctx, heroId, ...lines) {
+    const mp3 = await S.heroSpeech(heroId, ...lines);
+    if (mp3) await ctx.replyWithVoice({ source: mp3, filename: `${heroId}.mp3` }).catch((e) => console.error('[bot voice]', e.message));
+  }
+
+  // voice — bolaning ovozli xabari ({ data, mime }); bo'lmasa text javob sifatida olinadi
+  async function answerHero(ctx, user, text, voice) {
+    const chatId = heroChats.get(ctx.chat.id);
     try {
-      const r = await S.answerChat(user.id, heroChats.get(ctx.chat.id), text);
+      const r = voice
+        ? await S.answerChatVoice(user.id, chatId, voice.data, voice.mime)
+        : await S.answerChat(user.id, chatId, text);
+      if (r.heard) await ctx.reply(`🎤 Sen aytding: «${r.heard}»`);
       if (r.reply) await ctx.reply(r.reply);
       if (r.done) {
         heroChats.delete(ctx.chat.id);
-        return ctx.reply(`${r.bye}\n\n🔒 Javoblaringni faqat ustozing ko'radi.`, menuFor(user));
+        await ctx.reply(`${r.bye}\n\n🔒 Javoblaringni faqat ustozing ko'radi.`, menuFor(user));
+        return heroVoice(ctx, r.hero_id, r.reply, r.bye);
       }
-      return askQuestion(ctx, r.question, r.step, r.total);
+      await askQuestion(ctx, r.question, r.step, r.total);
+      return heroVoice(ctx, r.hero_id, r.reply, r.question);
     } catch (e) {
+      // Ovoz tushunilmasa suhbat davom etadi — bola qaytadan aytadi yoki yozadi
+      if (e.status === 422) return ctx.reply(e.message);
       heroChats.delete(ctx.chat.id);
       return ctx.reply(e.message || 'Xatolik', menuFor(user));
     }
@@ -241,8 +256,28 @@ export function createBot(token, { siteUrl = 'http://localhost:7000' } = {}) {
     const img = path.join(HERO_IMG_DIR, `${c.hero.id}.jpg`);
     if (fs.existsSync(img)) await ctx.replyWithPhoto({ source: img }, { caption: c.hello });
     else await ctx.reply(c.hello);
-    await ctx.reply("Javobingni yozib yubor ✍️ Bilmasang, «O'tkazib yuborish» tugmasini bos.");
-    return askQuestion(ctx, c.question, c.step, c.total);
+    await ctx.reply("Javobingni yozib yubor ✍️ yoki 🎤 ovozli xabar qilib ayt. Bilmasang, «O'tkazib yuborish» tugmasini bos.");
+    await askQuestion(ctx, c.question, c.step, c.total);
+    return heroVoice(ctx, c.hero.id, c.hello, c.question);
+  });
+
+  // Bola ovozli xabar bilan javob beradi
+  bot.on('voice', async (ctx) => {
+    const user = await S.getUserByChat(ctx.chat.id);
+    if (!user) return askLogin(ctx);
+    if (user.role !== 'student' || !heroChats.has(ctx.chat.id)) {
+      return ctx.reply("🎤 Ovozli javobni qahramon bilan suhbatda yuborishing mumkin. «💬 Qahramon bilan suhbat» tugmasini bos.", menuFor(user));
+    }
+    await ctx.sendChatAction('record_voice').catch(() => {});
+    const { file_id, mime_type } = ctx.message.voice;
+    let data;
+    try {
+      const res = await fetch(await ctx.telegram.getFileLink(file_id));
+      data = Buffer.from(await res.arrayBuffer());
+    } catch {
+      return ctx.reply("Ovozli xabarni ocholmadim 🙈 Qaytadan yuborib ko'r.");
+    }
+    return answerHero(ctx, user, '', { data, mime: mime_type || 'audio/ogg' });
   });
 
   bot.action('cskip', async (ctx) => {
@@ -324,8 +359,10 @@ export function createBot(token, { siteUrl = 'http://localhost:7000' } = {}) {
       const s = await S.getUser(studentId);
       const c = await S.getChat(chatId);
       // 🤖 — savolni AI bolaning oldingi javoblariga qarab tuzgan
-      const lines = c.answers.map((a) => `${a.flagged ? '🔴' : a.ai ? '🤖' : '❓'} ${esc(a.question)}\n💬 ${a.answer ? esc(a.answer.slice(0, 300)) : '<i>javob bermadi</i>'}`);
-      const legend = c.answers.some((a) => a.ai) ? '\n<i>🤖 — AI tuzgan savol</i>' : '';
+      const lines = c.answers.map((a) => `${a.flagged ? '🔴' : a.ai ? '🤖' : '❓'} ${esc(a.question)}\n${a.voice_id ? '🎤' : '💬'} ${a.answer ? esc(a.answer.slice(0, 300)) : '<i>javob bermadi</i>'}`);
+      const legend =
+        (c.answers.some((a) => a.ai) ? '\n<i>🤖 — AI tuzgan savol</i>' : '') +
+        (c.answers.some((a) => a.voice_id) ? "\n<i>🎤 — ovozli javob (asl ovozini saytdagi «Suhbatlar» bo'limida eshitasiz)</i>" : '');
       const to = await teacherChat(s);
       // Telegram bitta xabarga 4096 belgidan ko'pini sig'dirmaydi — bo'lib yuboramiz
       let msg = `💬 <b>${esc(s.full_name)}</b> ${c.hero.emoji} ${esc(c.hero.name)} bilan suhbatlashdi (kayfiyati: ${MOODS[c.mood]?.emoji || '—'})${legend}`;

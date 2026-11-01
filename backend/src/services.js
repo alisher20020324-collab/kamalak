@@ -3,8 +3,9 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { C, P, now, nextId } from './db.js';
 import { QUALITIES, MOODS, BADGES, AVATARS, today } from './constants.js';
-import { HEROES, SKIP_REPLY, ALERT_REPLY, isAlarming, questionText, heroCard, heroList } from './heroes.js';
-import { aiQuestion, aiEnabled } from './ai.js';
+import { speak, transcribe } from './voice.js';
+import { VOICES, HEROES, SKIP_REPLY, ALERT_REPLY, isAlarming, questionText, heroCard, heroList } from './heroes.js';
+import { aiQuestion, aiEnabled, aiAlarm } from './ai.js';
 
 // Sayt va bot o'rtasidagi hodisalar (bot bildirishnoma yuborish uchun tinglaydi)
 export const events = new EventEmitter();
@@ -348,13 +349,13 @@ export async function startChat(studentId, heroId) {
 }
 
 // Bola javobini saqlaydi; qahramonning munosabati va keyingi savolni qaytaradi
-export async function answerChat(studentId, chatId, answer) {
+export async function answerChat(studentId, chatId, answer, { voiceId, flagged } = {}) {
   const chat = await C.chats.findOne({ id: chatId, student_id: studentId });
   if (!chat) throw new AppError(404, 'Suhbat topilmadi');
   if (chat.finished) throw new AppError(400, 'Bu suhbat tugagan');
   const hero = HEROES[chat.hero];
   answer = String(answer || '').trim().slice(0, 500);
-  const alarming = isAlarming(answer);
+  const alarming = isAlarming(answer) || Boolean(flagged);
   // Eski suhbatlarda joriy savol saqlanmagan — tayyor ro'yxatdan olinadi
   const question = chat.question || questionText(chat.hero, chat.step, chat.mood);
   const step = chat.step + 1;
@@ -376,7 +377,7 @@ export async function answerChat(studentId, chatId, answer) {
   const res = await C.chats.updateOne(
     { id: chatId, step: chat.step, finished: false },
     {
-      $push: { answers: { question, answer, flagged: alarming, ai: Boolean(chat.question_ai), created_at: now() } },
+      $push: { answers: { question, answer, flagged: alarming, ai: Boolean(chat.question_ai), ...(voiceId && { voice_id: voiceId }), created_at: now() } },
       $set: { step, question: next, question_ai: Boolean(ai), finished: done, ...(alarming && { flagged: true }) },
     }
   );
@@ -390,12 +391,40 @@ export async function answerChat(studentId, chatId, answer) {
   const reply = alarming ? ALERT_REPLY : !answer ? SKIP_REPLY : canned ? hero.reactions[chat.step % hero.reactions.length] : null;
   return {
     reply,
+    hero_id: chat.hero,
     question: next,
     bye: done ? hero.bye : null,
     step,
     total: hero.questions.length,
     done,
   };
+}
+
+// Bola ovozli javob yubordi: asl ovozi o'qituvchi uchun saqlanadi, matni odatdagi javob kabi ishlanadi
+export async function answerChatVoice(studentId, chatId, audio, mime) {
+  if (!audio?.length) throw new AppError(400, 'Ovoz yozilmadi');
+  if (audio.length > 5 * 1024 * 1024) throw new AppError(413, 'Ovozli xabar juda uzun');
+  const chat = await C.chats.findOne({ id: chatId, student_id: studentId }, { projection: { finished: 1 } });
+  if (!chat) throw new AppError(404, 'Suhbat topilmadi');
+  if (chat.finished) throw new AppError(400, 'Bu suhbat tugagan');
+  const heard = await transcribe(audio, mime);
+  if (!heard) throw new AppError(422, "Ovozingni tushunolmadim 🙈 Yana bir marta, sekinroq aytib ko'r");
+  const voiceId = await nextId('voices');
+  await C.voices.insertOne({ id: voiceId, student_id: studentId, chat_id: chatId, mime: String(mime || 'audio/ogg').slice(0, 60), data: audio, created_at: now() });
+  // Ovozdan yozilgan matnda so'zlar buzilishi mumkin — AI ham tekshiradi
+  const flagged = await aiAlarm(heard);
+  return { heard, ...(await answerChat(studentId, chatId, heard, { voiceId, flagged })) };
+}
+
+// Qahramon gapi uning ovozida (MP3); ovoz o'chiq yoki ishlamasa null
+export const heroSpeech = (heroId, ...lines) => speak(VOICES[heroId], ...lines);
+
+// O'qituvchi o'z o'quvchisining ovozli javobini eshitadi
+export async function getVoice(teacherId, voiceId) {
+  const v = await C.voices.findOne({ id: voiceId });
+  if (!v) throw new AppError(404, 'Ovoz topilmadi');
+  await assertMyStudent(teacherId, v.student_id);
+  return { mime: v.mime, data: Buffer.from(v.data.buffer ?? v.data) };
 }
 
 export async function finishChat(studentId, chatId) {
@@ -408,7 +437,7 @@ export async function finishChat(studentId, chatId) {
 
 const chatView = (c, user) => ({
   id: c.id, student_id: c.student_id, hero: heroCard(c.hero), mood: c.mood, finished: c.finished, flagged: c.flagged,
-  day: c.day, created_at: c.created_at, answers: c.answers.map(({ question, answer, flagged, ai }) => ({ question, answer, flagged, ai: Boolean(ai) })),
+  day: c.day, created_at: c.created_at, answers: c.answers.map(({ question, answer, flagged, ai, voice_id }) => ({ question, answer, flagged, ai: Boolean(ai), voice_id: voice_id || null })),
   ...(user && { full_name: user.full_name, avatar: user.avatar }),
 });
 

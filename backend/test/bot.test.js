@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 process.env.MONGODB_DB = `kamalak_test_bot_${process.pid}`;
 process.env.GEMINI_API_KEY = process.env.GROQ_API_KEY = '';
+process.env.TTS_PYTHON = 'off';
 const S = await import('../src/services.js');
 const { connect, close } = await import('../src/db.js');
 const { createBot } = await import('../src/bot.js');

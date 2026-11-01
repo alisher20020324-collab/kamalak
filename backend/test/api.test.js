@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 process.env.MONGODB_DB = `kamalak_test_api_${process.pid}`;
 // AI o'chiq — testlar internetga chiqmaydi, tayyor savollar ishlatiladi
 process.env.GEMINI_API_KEY = process.env.GROQ_API_KEY = '';
+process.env.TTS_PYTHON = 'off';
 const { createApp } = await import('../src/app.js');
 const { connect, close } = await import('../src/db.js');
 
@@ -143,4 +144,29 @@ test("qahramon bilan suhbat: savollar, xavotirli javob, o'qituvchiga ko'rinadi",
 
   const other = await call('POST', '/auth/login', { login: 'ustoz2', password: 'secret1' });
   assert.equal((await call('GET', '/teacher/chats', null, other.data.token)).data.length, 0);
+});
+
+test("ovoz: qahramon ovozi, bolaning ovozli javobi, o'qituvchi eshitadi", async () => {
+  const auth = (t) => ({ Authorization: `Bearer ${t}` });
+  // Testlarda TTS o'chiq — ovoz yo'q (204), sahifa matn bilan ishlayveradi
+  const tts = await fetch(`${base}/student/tts`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(ctx.student) }, body: JSON.stringify({ hero: 'po', text: 'Salom' }) });
+  assert.equal(tts.status, 204);
+
+  const c = (await call('POST', '/student/chats', { hero: 'olaf' }, ctx.student)).data;
+  const send = (body, type) => fetch(`${base}/student/chats/${c.id}/voice`, { method: 'POST', headers: { 'Content-Type': type, ...auth(ctx.student) }, body });
+  assert.equal((await send('', 'audio/ogg')).status, 400, "bo'sh ovoz");
+  const r = await send(Buffer.alloc(5000, 1), 'audio/webm;codecs=opus');
+  assert.equal(r.status, 422, 'Groq kaliti yo\'q — tushunilmadi');
+  assert.match((await r.json()).error, /tushunolmadim/);
+
+  // Saqlangan ovozni faqat o'z o'qituvchisi eshitadi
+  const { C } = await import('../src/db.js');
+  await C.voices.insertOne({ id: 9001, student_id: ctx.studentId, chat_id: c.id, mime: 'audio/ogg', data: Buffer.from('OggS-test'), created_at: '' });
+  const v = await fetch(`${base}/teacher/voices/9001`, { headers: auth(ctx.teacher) });
+  assert.equal(v.status, 200);
+  assert.equal(v.headers.get('content-type'), 'audio/ogg');
+  assert.equal(Buffer.from(await v.arrayBuffer()).toString(), 'OggS-test');
+  const other = (await call('POST', '/auth/login', { login: 'ustoz2', password: 'secret1' })).data.token;
+  assert.equal((await fetch(`${base}/teacher/voices/9001`, { headers: auth(other) })).status, 404, "begona o'qituvchi");
+  assert.equal((await fetch(`${base}/teacher/voices/1`, { headers: auth(ctx.teacher) })).status, 404);
 });
