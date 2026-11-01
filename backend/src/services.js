@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { C, P, now, nextId } from './db.js';
 import { QUALITIES, MOODS, BADGES, AVATARS, today } from './constants.js';
 import { HEROES, SKIP_REPLY, ALERT_REPLY, isAlarming, questionText, heroCard, heroList } from './heroes.js';
+import { aiQuestion } from './ai.js';
 
 // Sayt va bot o'rtasidagi hodisalar (bot bildirishnoma yuborish uchun tinglaydi)
 export const events = new EventEmitter();
@@ -334,12 +335,13 @@ export async function startChat(studentId, heroId) {
   if (!hero) throw new AppError(400, 'Qahramonni tanlang');
   const mood = (await todayMood(studentId))?.mood ?? 3;
   const id = await nextId('chats');
-  await C.chats.insertOne({ id, student_id: studentId, hero: heroId, mood, step: 0, finished: false, flagged: false, day: today(), answers: [], created_at: now() });
+  const question = questionText(heroId, 0, mood);
+  await C.chats.insertOne({ id, student_id: studentId, hero: heroId, mood, step: 0, question, finished: false, flagged: false, day: today(), answers: [], created_at: now() });
   return {
     id,
     hero: heroCard(heroId),
     hello: mood <= 2 ? hero.hello.low : hero.hello.ok,
-    question: questionText(heroId, 0, mood),
+    question,
     step: 0,
     total: hero.questions.length,
   };
@@ -353,16 +355,27 @@ export async function answerChat(studentId, chatId, answer) {
   const hero = HEROES[chat.hero];
   answer = String(answer || '').trim().slice(0, 500);
   const alarming = isAlarming(answer);
-  const question = questionText(chat.hero, chat.step, chat.mood);
+  // Eski suhbatlarda joriy savol saqlanmagan — tayyor ro'yxatdan olinadi
+  const question = chat.question || questionText(chat.hero, chat.step, chat.mood);
   const step = chat.step + 1;
   const done = step >= hero.questions.length;
+
+  // Keyingi savolni AI bolaning javoblariga qarab tuzadi; xavotirli javobdan keyin yoki AI ishlamasa — tayyor savol
+  let next = null;
+  if (!done) {
+    const topic = questionText(chat.hero, step, chat.mood);
+    next = (!alarming && await aiQuestion({
+      hero, mood: chat.mood, topic, step, total: hero.questions.length,
+      history: [...chat.answers, { question, answer }],
+    })) || topic;
+  }
 
   // step sharti — bir javob ikki marta yuborilsa, ikkinchisi yozilmaydi
   const res = await C.chats.updateOne(
     { id: chatId, step: chat.step, finished: false },
     {
       $push: { answers: { question, answer, flagged: alarming, created_at: now() } },
-      $set: { step, finished: done, ...(alarming && { flagged: true }) },
+      $set: { step, question: next, finished: done, ...(alarming && { flagged: true }) },
     }
   );
   if (!res.modifiedCount) throw new AppError(409, 'Javob allaqachon yuborilgan');
@@ -372,7 +385,7 @@ export async function answerChat(studentId, chatId, answer) {
   const reply = alarming ? ALERT_REPLY : answer ? hero.reactions[chat.step % hero.reactions.length] : SKIP_REPLY;
   return {
     reply,
-    question: done ? null : questionText(chat.hero, step, chat.mood),
+    question: next,
     bye: done ? hero.bye : null,
     step,
     total: hero.questions.length,

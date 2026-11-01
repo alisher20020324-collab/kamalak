@@ -1,4 +1,4 @@
-// Multfilm qahramonlari. Har biri bola bilan tayyor savollar asosida suhbatlashadi.
+// Multfilm qahramonlari. Birinchi savol tayyor; keyingilarini AI (ai.js) bolaning javoblariga qarab shu mavzularda tuzadi, AI ishlamasa tayyor savollar ishlatiladi.
 // Rasmlar va obrazlar o'z mualliflariga tegishli (DreamWorks, Disney) — platforma maktab ichida, o'quv maqsadida ishlatiladi.
 // Savollar mavzusi: bugungi kun, kayfiyat sababi, maktab, do'stlar, oila, his-tuyg'ular, qobiliyat, orzu.
 // Savol { ok, low } ko'rinishida bo'lsa, bolaning bugungi kayfiyatiga qarab tanlanadi (low — 1-2 ball).

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 // Har bir test ishga tushganda alohida vaqtinchalik baza, oxirida o'chiriladi
 process.env.MONGODB_DB = `kamalak_test_api_${process.pid}`;
+// AI o'chiq — testlar internetga chiqmaydi, tayyor savollar ishlatiladi
+process.env.GEMINI_API_KEY = process.env.GROQ_API_KEY = '';
 const { createApp } = await import('../src/app.js');
 const { connect, close } = await import('../src/db.js');
 

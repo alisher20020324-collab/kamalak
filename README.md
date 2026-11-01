@@ -12,7 +12,7 @@ O'quvchi va o'qituvchi uchun veb-sayt + Telegram bot. Ikkalasi bitta bazadan foy
 
 ## Imkoniyatlar
 
-**Qahramon bilan suhbat:** o'quvchi avval kayfiyatini belgilaydi, keyin 6 ta qahramondan birini tanlaydi (🐼 Po, 🥋 Ustoz Shifu, 🐰 Judi, 🦊 Nik, ⛄ Olaf, 🧅 Shrek). Rasmlar `frontend/public/heroes/` papkasida; obrazlar DreamWorks va Disney'ga tegishli, shuning uchun platforma maktab ichida ishlatilishi kerak. Qahramon 8 ta savol beradi: bugungi kun, kayfiyat sababi, maktab, do'stlar, oila, his-tuyg'ular, qobiliyat va orzular haqida. Birinchi savol bolaning kayfiyatiga moslashadi. Javoblarni faqat o'z o'qituvchisi ko'radi. Zo'ravonlik, qo'rquv yoki o'ziga zarar haqidagi so'zlar topilsa, o'qituvchiga Telegramda darhol 🔴 ogohlantirish boradi. Savollar va xavotirli so'zlar ro'yxati `backend/src/heroes.js` faylida.
+**Qahramon bilan suhbat:** o'quvchi avval kayfiyatini belgilaydi, keyin 6 ta qahramondan birini tanlaydi (🐼 Po, 🥋 Ustoz Shifu, 🐰 Judi, 🦊 Nik, ⛄ Olaf, 🧅 Shrek). Rasmlar `frontend/public/heroes/` papkasida; obrazlar DreamWorks va Disney'ga tegishli, shuning uchun platforma maktab ichida ishlatilishi kerak. Qahramon 8 ta savol beradi: bugungi kun, kayfiyat sababi, maktab, do'stlar, oila, his-tuyg'ular, qobiliyat va orzular haqida. Birinchi savol bolaning kayfiyatiga moslashadi. Keyingi savollarni AI (avval Gemini, u ishlamasa Groq) bolaning javoblariga qarab, shu mavzular doirasida tuzadi; kalit berilmagan yoki AI javob bermagan bo'lsa, tayyor savollar beriladi. Xavotirli javobdan keyin AI chaqirilmaydi. Javoblarni faqat o'z o'qituvchisi ko'radi. Zo'ravonlik, qo'rquv yoki o'ziga zarar haqidagi so'zlar topilsa, o'qituvchiga Telegramda darhol 🔴 ogohlantirish boradi. Savollar va xavotirli so'zlar ro'yxati `backend/src/heroes.js` faylida.
 
 **O'quvchi:** kunlik kayfiyat kundaligi (izoh bilan) · shaxsiy maqsadlar va foiz bilan bajarilishi · «Men qandayman?»: 5 ta sifat bo'yicha o'zini baholash, natija diagrammada ko'rinadi · topshiriqlarni bajarish va yulduz yig'ish · nishonlar va darajalar.
 
@@ -41,6 +41,14 @@ npm start               # http://localhost:7000
 Demo akkauntlar (`npm run seed` dan keyin):
 - O'qituvchi: `ustoz` / `ustoz123`
 - O'quvchilar: `ali`, `malika`, `jasur`, `zarina`, `bobur`, `nilufar` / `123456`
+
+### AI savollarni yoqish (bepul)
+`backend/.env` fayliga bitta yoki ikkala kalitni yozing:
+```
+GEMINI_API_KEY=...   # https://aistudio.google.com/apikey
+GROQ_API_KEY=...     # https://console.groq.com/keys
+```
+Model nomini `GEMINI_MODEL` / `GROQ_MODEL` bilan o'zgartirish mumkin (standart: `gemini-3.6-flash`, `openai/gpt-oss-120b`).
 
 ### Telegram botni yoqish
 1. Telegramda [@BotFather](https://t.me/BotFather) → `/newbot` → token oling.
