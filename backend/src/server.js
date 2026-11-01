@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createApp } from './app.js';
 import { createBot } from './bot.js';
 import { connect, close } from './db.js';
+import { closeIdleChats } from './services.js';
 
 const PORT = Number(process.env.PORT) || 7000;
 const SITE_URL = process.env.SITE_URL || `http://localhost:${PORT}`;
@@ -16,6 +17,9 @@ try {
 
 const app = createApp();
 const server = app.listen(PORT, () => console.log(`🌈 Kamalak server: ${SITE_URL}`));
+
+// Tashlab ketilgan suhbatlarning javoblari ham o'qituvchiga borsin (har daqiqada tekshiriladi)
+setInterval(() => closeIdleChats().catch((e) => console.error('[idle chats]', e.message)), 60_000).unref();
 
 let bot = null;
 if (process.env.BOT_TOKEN) {

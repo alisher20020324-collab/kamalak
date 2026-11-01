@@ -139,6 +139,16 @@ test("qahramon bilan suhbat: javoblar va xavotirli javob o'qituvchiga boradi", a
   assert.match(lastText(), /maqsad/i, 'suhbat tugagach oddiy matn javob sifatida olinmaydi');
 });
 
+test("tashlab ketilgan suhbat ham o'qituvchiga boradi", async () => {
+  const c = await S.startChat(student.id, 'olaf');
+  await S.answerChat(student.id, c.id, 'Qor yog\'di');
+  assert.equal(await S.closeIdleChats(15), 0, 'hali vaqt o\'tmagan');
+  assert.equal(await S.closeIdleChats(-1), 1);
+  await settle();
+  assert.ok(sent.some((m) => m.chat_id === '888' && m.text?.includes('Olaf bilan suhbatlashdi') && m.text.includes("Qor yog'di")));
+  assert.equal(await S.closeIdleChats(-1), 0, 'ikkinchi marta yuborilmaydi');
+});
+
 test('yutuqlar va chiqish', async () => {
   await say('🏆 Yutuqlarim');
   assert.match(lastText(), /Yulduzlar: <b>2<\/b>/);

@@ -33,7 +33,7 @@ export function ChatCard({ chat, showStudent = true }) {
         <summary className="small">Javoblar ({chat.answers.length})</summary>
         {chat.answers.map((a, i) => (
           <div key={i} className={`qa ${a.flagged ? 'flagged' : ''}`}>
-            <div className="small muted">❓ {a.question}</div>
+            <div className="small muted">{a.ai ? <span title="AI tuzgan savol">🤖</span> : '❓'} {a.question}</div>
             <div>{a.answer ? `💬 ${a.answer}` : <i className="muted">javob bermadi</i>}</div>
           </div>
         ))}

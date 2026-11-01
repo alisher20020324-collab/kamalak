@@ -323,8 +323,20 @@ export function createBot(token, { siteUrl = 'http://localhost:7000' } = {}) {
     chatFinished: async ({ studentId, chatId }) => {
       const s = await S.getUser(studentId);
       const c = await S.getChat(chatId);
-      const lines = c.answers.map((a) => `${a.flagged ? '🔴' : '❓'} ${esc(a.question)}\n💬 ${a.answer ? esc(a.answer.slice(0, 300)) : '<i>javob bermadi</i>'}`);
-      send(await teacherChat(s), `💬 <b>${esc(s.full_name)}</b> ${c.hero.emoji} ${esc(c.hero.name)} bilan suhbatlashdi (kayfiyati: ${MOODS[c.mood]?.emoji || '—'})\n\n${lines.join('\n\n')}`);
+      // 🤖 — savolni AI bolaning oldingi javoblariga qarab tuzgan
+      const lines = c.answers.map((a) => `${a.flagged ? '🔴' : a.ai ? '🤖' : '❓'} ${esc(a.question)}\n💬 ${a.answer ? esc(a.answer.slice(0, 300)) : '<i>javob bermadi</i>'}`);
+      const legend = c.answers.some((a) => a.ai) ? '\n<i>🤖 — AI tuzgan savol</i>' : '';
+      const to = await teacherChat(s);
+      // Telegram bitta xabarga 4096 belgidan ko'pini sig'dirmaydi — bo'lib yuboramiz
+      let msg = `💬 <b>${esc(s.full_name)}</b> ${c.hero.emoji} ${esc(c.hero.name)} bilan suhbatlashdi (kayfiyati: ${MOODS[c.mood]?.emoji || '—'})${legend}`;
+      for (const l of lines) {
+        if (msg.length + l.length + 2 > 4000) {
+          await send(to, msg);
+          msg = '';
+        }
+        msg += (msg ? '\n\n' : '') + l;
+      }
+      await send(to, msg);
     },
     feedback: async ({ studentId, title, feedback, stars }) => {
       send((await S.getUser(studentId))?.telegram_chat_id, `✍️ Ustoz «${esc(title)}» topshirig'ingizni tekshirdi: ${'⭐'.repeat(stars) || '—'}${feedback ? `\n💬 «${esc(feedback)}»` : ''}`);

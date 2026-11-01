@@ -336,7 +336,7 @@ export async function startChat(studentId, heroId) {
   const mood = (await todayMood(studentId))?.mood ?? 3;
   const id = await nextId('chats');
   const question = questionText(heroId, 0, mood);
-  await C.chats.insertOne({ id, student_id: studentId, hero: heroId, mood, step: 0, question, finished: false, flagged: false, day: today(), answers: [], created_at: now() });
+  await C.chats.insertOne({ id, student_id: studentId, hero: heroId, mood, step: 0, question, question_ai: false, finished: false, flagged: false, day: today(), answers: [], created_at: now() });
   return {
     id,
     hero: heroCard(heroId),
@@ -376,8 +376,8 @@ export async function answerChat(studentId, chatId, answer) {
   const res = await C.chats.updateOne(
     { id: chatId, step: chat.step, finished: false },
     {
-      $push: { answers: { question, answer, flagged: alarming, created_at: now() } },
-      $set: { step, question: next, finished: done, ...(alarming && { flagged: true }) },
+      $push: { answers: { question, answer, flagged: alarming, ai: Boolean(chat.question_ai), created_at: now() } },
+      $set: { step, question: next, question_ai: Boolean(ai), finished: done, ...(alarming && { flagged: true }) },
     }
   );
   if (!res.modifiedCount) throw new AppError(409, 'Javob allaqachon yuborilgan');
@@ -408,9 +408,26 @@ export async function finishChat(studentId, chatId) {
 
 const chatView = (c, user) => ({
   id: c.id, student_id: c.student_id, hero: heroCard(c.hero), mood: c.mood, finished: c.finished, flagged: c.flagged,
-  day: c.day, created_at: c.created_at, answers: c.answers.map(({ question, answer, flagged }) => ({ question, answer, flagged })),
+  day: c.day, created_at: c.created_at, answers: c.answers.map(({ question, answer, flagged, ai }) => ({ question, answer, flagged, ai: Boolean(ai) })),
   ...(user && { full_name: user.full_name, avatar: user.avatar }),
 });
+
+// Bola suhbatni yarim yo'lda tashlab ketsa, javoblari o'qituvchiga baribir borishi kerak:
+// oxirgi javobdan beri idleMin daqiqa o'tgan suhbatlar tugatiladi va o'qituvchiga yuboriladi
+export async function closeIdleChats(idleMin = 15) {
+  const cutoff = new Date(Date.now() - idleMin * 60_000).toISOString().replace('T', ' ').slice(0, 19);
+  const open = await C.chats.find({ finished: false, step: { $gt: 0 } }).project({ id: 1, student_id: 1, answers: { $slice: -1 } }).toArray();
+  let closed = 0;
+  for (const c of open) {
+    if (!(c.answers[0]?.created_at < cutoff)) continue;
+    const res = await C.chats.updateOne({ id: c.id, finished: false }, { $set: { finished: true } });
+    if (res.modifiedCount) {
+      events.emit('chatFinished', { studentId: c.student_id, chatId: c.id });
+      closed++;
+    }
+  }
+  return closed;
+}
 
 export const getChat = async (chatId) => chatView(await C.chats.findOne({ id: chatId }));
 
