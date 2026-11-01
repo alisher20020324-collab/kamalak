@@ -53,10 +53,53 @@ export function speak(voice, ...lines) {
   return job;
 }
 
-// Bolaning ovozli xabarini matnga aylantiradi; tushunilmasa null
+// Bolaning ovozli xabarini matnga aylantiradi; tushunilmasa null.
+// Avval Gemini — bolalar nutqini o'zbekchada ancha to'g'ri yozadi ("Meix, eich cana go'in" emas,
+// "Men hech qanaqa o'yin o'ynashni xohlamayman"). Ishlamasa yoki limiti tugasa — Groq Whisper.
 export async function transcribe(buffer, mime = 'audio/ogg') {
+  if (!buffer?.length) return null;
+  return (await geminiTranscribe(buffer, mime)) ?? whisperTranscribe(buffer, mime);
+}
+
+const clip = (text) => {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  return t.length >= 2 ? t.slice(0, 500) : null;
+};
+
+let geminiPausedUntil = 0;
+async function geminiTranscribe(buffer, mime) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || Date.now() < geminiPausedUntil) return null;
+  const model = process.env.GEMINI_STT_MODEL || 'gemini-3.5-flash-lite';
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inline_data: { mime_type: mime.split(';')[0], data: buffer.toString('base64') } },
+            { text: "Bu 7-9 yoshli bolaning o'zbek tilidagi ovozli xabari. Bola aytgan gapni o'zbek tilida, lotin yozuvida, to'g'ri imlo bilan so'zma-so'z yozib ber. O'zingdan hech narsa qo'shma, faqat matnning o'zini yoz. Hech narsa eshitilmasa, bo'sh qoldir." },
+          ],
+        }],
+        generationConfig: { temperature: 0, maxOutputTokens: 400 },
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (res.status === 429) geminiPausedUntil = Date.now() + 60_000;
+    if (!res.ok) throw new Error(`Gemini STT ${res.status}`);
+    const data = await res.json();
+    return clip(data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join(''));
+  } catch (e) {
+    console.warn('⚠️ Gemini ovozni matnga aylantira olmadi:', e.message);
+    return null;
+  }
+}
+
+async function whisperTranscribe(buffer, mime) {
   const key = process.env.GROQ_API_KEY;
-  if (!key || !buffer?.length) return null;
+  if (!key) return null;
   const ext = mime.includes('webm') ? 'webm' : mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.includes('mpeg') ? 'mp3' : 'ogg';
   const form = new FormData();
   form.append('file', new Blob([buffer], { type: mime }), `javob.${ext}`);
@@ -75,8 +118,7 @@ export async function transcribe(buffer, mime = 'audio/ogg') {
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`Groq STT ${res.status}`);
-    const text = String((await res.json()).text || '').trim();
-    return text.length >= 2 ? text.slice(0, 500) : null;
+    return clip((await res.json()).text);
   } catch (e) {
     console.warn('⚠️ Ovozli javob matnga aylantirilmadi:', e.message);
     return null;

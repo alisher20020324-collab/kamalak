@@ -201,9 +201,21 @@ export default function StudentChat() {
       <div className="chat-log" ref={logRef}>
         {msgs.map((m, i) => (
           m.from === 'hero' ? (
-            <button key={i} type="button" className="bubble hero" title="Yana eshitish" onClick={async () => play(await voiceOf(hero.id, m.text))}>
-              {m.text} <span className="say">🔊</span>
-            </button>
+            <div key={i} className="bubble-row">
+              <div className="bubble hero">{m.text}</div>
+              <button
+                type="button"
+                className="say-btn"
+                title="O'qib berish"
+                aria-label="O'qib berish"
+                onClick={async () => {
+                  const url = await voiceOf(hero.id, m.text);
+                  url ? play(url) : toast('🔇 Ovoz hozircha ishlamayapti');
+                }}
+              >
+                🔊
+              </button>
+            </div>
           ) : (
             <div key={i} className={`bubble ${m.from}`}>{m.text}</div>
           )

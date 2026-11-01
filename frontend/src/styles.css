@@ -300,8 +300,10 @@ table.simple td, table.simple th { padding: 8px 6px; text-align: left; border-bo
 @keyframes blink { 50% { opacity: 0.25; } }
 .chat-form { display: flex; flex-direction: column; gap: 8px; }
 .chat-form textarea.input { min-height: 0; }
-button.bubble { font: inherit; color: inherit; text-align: left; border: 0; cursor: pointer; }
-.bubble .say { font-size: 0.85em; opacity: 0.55; }
+.bubble-row { display: flex; align-items: flex-end; gap: 6px; align-self: flex-start; max-width: 90%; }
+.bubble-row .bubble { max-width: none; }
+.say-btn { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--sun); background: #fff; font-size: 1.3rem; cursor: pointer; }
+.say-btn:active { transform: scale(0.92); }
 .btn.mic { width: 100%; font-size: 1.15rem; padding: 14px; }
 .btn.rec { animation: rec-pulse 1s infinite; }
 @keyframes rec-pulse { 50% { box-shadow: 0 0 0 8px rgba(255, 107, 107, 0.25); } }

@@ -48,7 +48,7 @@ Demo akkauntlar (`npm run seed` dan keyin):
 GEMINI_API_KEY=...   # https://aistudio.google.com/apikey
 GROQ_API_KEY=...     # https://console.groq.com/keys
 ```
-Model nomini `GEMINI_MODEL` / `GROQ_MODEL` bilan o'zgartirish mumkin (standart: `gemini-3.6-flash`, `openai/gpt-oss-120b`).
+Model nomini `GEMINI_MODEL` / `GROQ_MODEL` bilan o'zgartirish mumkin (standart: `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`).
 
 ### Ovozni yoqish
 Qahramon ovozi uchun Python va edge-tts kerak: `pip install edge-tts` (`python` buyrug'i PATH'da bo'lsin, boshqa joyda bo'lsa `TTS_PYTHON=` ga yo'lini yozing; `TTS_PYTHON=off` — ovoz o'chiq). Ovozlar `backend/data/tts/` papkasida keshlanadi. Bolaning ovozini matnga aylantirish uchun `GROQ_API_KEY` kerak.
