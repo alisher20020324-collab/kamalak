@@ -211,7 +211,7 @@ export function createBot(token, { siteUrl = 'http://localhost:7000' } = {}) {
   async function answerHero(ctx, user, text) {
     try {
       const r = await S.answerChat(user.id, heroChats.get(ctx.chat.id), text);
-      await ctx.reply(r.reply);
+      if (r.reply) await ctx.reply(r.reply);
       if (r.done) {
         heroChats.delete(ctx.chat.id);
         return ctx.reply(`${r.bye}\n\n🔒 Javoblaringni faqat ustozing ko'radi.`, menuFor(user));

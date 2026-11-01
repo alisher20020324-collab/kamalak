@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { C, P, now, nextId } from './db.js';
 import { QUALITIES, MOODS, BADGES, AVATARS, today } from './constants.js';
 import { HEROES, SKIP_REPLY, ALERT_REPLY, isAlarming, questionText, heroCard, heroList } from './heroes.js';
-import { aiQuestion } from './ai.js';
+import { aiQuestion, aiEnabled } from './ai.js';
 
 // Sayt va bot o'rtasidagi hodisalar (bot bildirishnoma yuborish uchun tinglaydi)
 export const events = new EventEmitter();
@@ -362,12 +362,14 @@ export async function answerChat(studentId, chatId, answer) {
 
   // Keyingi savolni AI bolaning javoblariga qarab tuzadi; xavotirli javobdan keyin yoki AI ishlamasa — tayyor savol
   let next = null;
+  let ai = null;
   if (!done) {
     const topic = questionText(chat.hero, step, chat.mood);
-    next = (!alarming && await aiQuestion({
+    if (!alarming) ai = await aiQuestion({
       hero, mood: chat.mood, topic, step, total: hero.questions.length,
       history: [...chat.answers, { question, answer }],
-    })) || topic;
+    });
+    next = ai || topic;
   }
 
   // step sharti — bir javob ikki marta yuborilsa, ikkinchisi yozilmaydi
@@ -382,7 +384,10 @@ export async function answerChat(studentId, chatId, answer) {
   if (alarming) events.emit('chatAlert', { studentId, hero: hero.name, question, answer });
   if (done) events.emit('chatFinished', { studentId, chatId });
 
-  const reply = alarming ? ALERT_REPLY : answer ? hero.reactions[chat.step % hero.reactions.length] : SKIP_REPLY;
+  // Tayyor munosabat ("Voy, zo'r-ku!") bola javobiga mos kelmasligi mumkin: AI savoli o'zi javobga munosabat bildiradi,
+  // oxirgi javobdan keyin esa xayrlashuv keladi — shu hollarda munosabat yuborilmaydi
+  const canned = !ai && !(done && aiEnabled());
+  const reply = alarming ? ALERT_REPLY : !answer ? SKIP_REPLY : canned ? hero.reactions[chat.step % hero.reactions.length] : null;
   return {
     reply,
     question: next,
