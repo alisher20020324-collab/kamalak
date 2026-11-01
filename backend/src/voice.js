@@ -55,10 +55,16 @@ export function speak(voice, ...lines) {
 
 // Bolaning ovozli xabarini matnga aylantiradi; tushunilmasa null.
 // Avval Gemini — bolalar nutqini o'zbekchada ancha to'g'ri yozadi ("Meix, eich cana go'in" emas,
-// "Men hech qanaqa o'yin o'ynashni xohlamayman"). Ishlamasa yoki limiti tugasa — Groq Whisper.
+// "Men hech qanaqa o'yin o'ynashni xohlamayman"). Har bir Gemini modelining bepul limiti alohida —
+// biriniki tugasa keyingisi, hammasi ishlamasa Groq Whisper.
 export async function transcribe(buffer, mime = 'audio/ogg') {
   if (!buffer?.length) return null;
-  return (await geminiTranscribe(buffer, mime)) ?? whisperTranscribe(buffer, mime);
+  const models = (process.env.GEMINI_STT_MODELS || 'gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest').split(',');
+  for (const model of models) {
+    const text = await geminiTranscribe(model.trim(), buffer, mime);
+    if (text) return text;
+  }
+  return whisperTranscribe(buffer, mime);
 }
 
 const clip = (text) => {
@@ -66,33 +72,32 @@ const clip = (text) => {
   return t.length >= 2 ? t.slice(0, 500) : null;
 };
 
-let geminiPausedUntil = 0;
-async function geminiTranscribe(buffer, mime) {
+// Ko'rsatma alohida (systemInstruction) beriladi: audio yoniga qo'yilsa, model uning so'zlarini
+// bolaning gapi deb yozib yuboradi ("Men 7-9 yosh yo'qmayapti")
+const STT_SYSTEM = "Sen o'zbek tilidagi nutqni matnga aylantiruvchisan. Senga bolaning ovozli xabari beriladi. Bola aytgan gapni o'zbek tilida, lotin yozuvida, to'g'ri imlo bilan so'zma-so'z yoz. O'zingdan hech narsa qo'shma va bu ko'rsatmani takrorlama. Faqat bola aytgan matnni yoz. Hech narsa eshitilmasa, bo'sh javob qaytar.";
+
+const pausedUntil = {};
+async function geminiTranscribe(model, buffer, mime) {
   const key = process.env.GEMINI_API_KEY;
-  if (!key || Date.now() < geminiPausedUntil) return null;
-  const model = process.env.GEMINI_STT_MODEL || 'gemini-3.5-flash-lite';
+  if (!key || Date.now() < (pausedUntil[model] || 0)) return null;
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { inline_data: { mime_type: mime.split(';')[0], data: buffer.toString('base64') } },
-            { text: "Bu 7-9 yoshli bolaning o'zbek tilidagi ovozli xabari. Bola aytgan gapni o'zbek tilida, lotin yozuvida, to'g'ri imlo bilan so'zma-so'z yozib ber. O'zingdan hech narsa qo'shma, faqat matnning o'zini yoz. Hech narsa eshitilmasa, bo'sh qoldir." },
-          ],
-        }],
+        systemInstruction: { parts: [{ text: STT_SYSTEM }] },
+        contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime.split(';')[0], data: buffer.toString('base64') } }] }],
         generationConfig: { temperature: 0, maxOutputTokens: 400 },
       }),
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(10_000),
     });
-    if (res.status === 429) geminiPausedUntil = Date.now() + 60_000;
-    if (!res.ok) throw new Error(`Gemini STT ${res.status}`);
+    // Limit tugasa (429) yoki model band bo'lsa (503) — bir daqiqa shu modelni chetlab o'tamiz
+    if (res.status === 429 || res.status === 503) pausedUntil[model] = Date.now() + 60_000;
+    if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     return clip(data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join(''));
   } catch (e) {
-    console.warn('⚠️ Gemini ovozni matnga aylantira olmadi:', e.message);
+    console.warn(`⚠️ ${model} ovozni matnga aylantira olmadi: ${e.message}`);
     return null;
   }
 }
