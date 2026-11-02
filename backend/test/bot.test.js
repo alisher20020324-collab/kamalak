@@ -125,14 +125,14 @@ test("qahramon bilan suhbat: javoblar va xavotirli javob o'qituvchiga boradi", a
   await say('💬 Qahramon bilan suhbat');
   assert.match(lastText(), /Qaysi qahramon/);
   await press('hero:shrek');
-  assert.match(lastText(), /1\/8/);
+  assert.match(lastText(), /1\/16/);
   await say('Hech kim meni xafa qilmadi');
-  assert.match(lastText(), /2\/8/);
+  assert.match(lastText(), /2\/16/);
   await say('Sinfdoshlarim meni masxara qilishadi');
   await settle();
   assert.ok(sent.some((m) => m.chat_id === '888' && m.text?.includes('Diqqat')), "o'qituvchiga ogohlantirish borishi kerak");
   await press('cskip');
-  assert.match(lastText(), /4\/8/);
+  assert.match(lastText(), /4\/16/);
   await press('cstop');
   await settle();
   assert.ok(sent.some((m) => m.chat_id === '888' && m.text?.includes('Shrek bilan suhbatlashdi')));

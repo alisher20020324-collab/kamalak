@@ -294,8 +294,23 @@ const ALERT_RE = new RegExp(`(?<![\\p{L}'])(${ALERT_WORDS.map((w) => w.replace(/
 
 export const isAlarming = (text) => ALERT_RE.test(norm(text));
 
+// Suhbatda jami savollar soni. Qahramonning o'z 8 ta savolidan keyin barcha qahramonlar uchun umumiy
+// mavzular davom etadi — AI ularni ham bola javoblariga moslab, qahramon uslubida qayta tuzadi
+export const QUESTION_COUNT = 16;
+const EXTRA_QUESTIONS = [
+  'Sevimli multfilming yoki ertaging qaysi? Senga nimasi yoqadi?',
+  'Qaysi hayvonni eng yaxshi ko\'rasan? Nega?',
+  'Sevimli taoming nima? Uni kim tayyorlaydi?',
+  "Bugun kimgadir yordam berdingmi yoki kimdir senga yordam berdimi?",
+  "Eng yoqtirgan o'yining qaysi? Uni kim bilan o'ynaysan?",
+  "Xafa bo'lganingda seni nima tinchlantiradi?",
+  'Ertaga nima qilishni xohlaysan?',
+  "Suhbatimizdan keyin o'zingni qanday his qilyapsan?",
+];
+
 export const questionText = (hero, step, mood) => {
-  const qn = HEROES[hero].questions[step];
+  const own = HEROES[hero].questions;
+  const qn = step < own.length ? own[step] : EXTRA_QUESTIONS[(step - own.length) % EXTRA_QUESTIONS.length];
   return typeof qn === 'string' ? qn : mood <= 2 ? qn.low : qn.ok;
 };
 

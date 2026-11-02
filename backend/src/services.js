@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { C, P, now, nextId } from './db.js';
 import { QUALITIES, MOODS, BADGES, AVATARS, today } from './constants.js';
 import { speak, transcribe } from './voice.js';
-import { VOICES, HEROES, SKIP_REPLY, ALERT_REPLY, isAlarming, questionText, heroCard, heroList } from './heroes.js';
+import { VOICES, HEROES, QUESTION_COUNT, SKIP_REPLY, ALERT_REPLY, isAlarming, questionText, heroCard, heroList } from './heroes.js';
 import { aiQuestion, aiEnabled, aiAlarm } from './ai.js';
 
 // Sayt va bot o'rtasidagi hodisalar (bot bildirishnoma yuborish uchun tinglaydi)
@@ -344,7 +344,7 @@ export async function startChat(studentId, heroId) {
     hello: mood <= 2 ? hero.hello.low : hero.hello.ok,
     question,
     step: 0,
-    total: hero.questions.length,
+    total: QUESTION_COUNT,
   };
 }
 
@@ -359,7 +359,7 @@ export async function answerChat(studentId, chatId, answer, { voiceId, flagged }
   // Eski suhbatlarda joriy savol saqlanmagan — tayyor ro'yxatdan olinadi
   const question = chat.question || questionText(chat.hero, chat.step, chat.mood);
   const step = chat.step + 1;
-  const done = step >= hero.questions.length;
+  const done = step >= QUESTION_COUNT;
 
   // Keyingi savolni AI bolaning javoblariga qarab tuzadi; xavotirli javobdan keyin yoki AI ishlamasa — tayyor savol
   let next = null;
@@ -367,7 +367,7 @@ export async function answerChat(studentId, chatId, answer, { voiceId, flagged }
   if (!done) {
     const topic = questionText(chat.hero, step, chat.mood);
     if (!alarming) ai = await aiQuestion({
-      hero, mood: chat.mood, topic, step, total: hero.questions.length,
+      hero, mood: chat.mood, topic, step, total: QUESTION_COUNT,
       history: [...chat.answers, { question, answer }],
     });
     next = ai || topic;
@@ -395,7 +395,7 @@ export async function answerChat(studentId, chatId, answer, { voiceId, flagged }
     question: next,
     bye: done ? hero.bye : null,
     step,
-    total: hero.questions.length,
+    total: QUESTION_COUNT,
     done,
   };
 }
