@@ -225,7 +225,7 @@ export function createBot(token, { siteUrl = 'http://localhost:7000' } = {}) {
       if (r.reply) await ctx.reply(r.reply);
       if (r.done) {
         heroChats.delete(ctx.chat.id);
-        await ctx.reply(`${r.bye}\n\n🔒 Javoblaringni faqat ustozing ko'radi.`, menuFor(user));
+        await ctx.reply(r.bye, menuFor(user));
         return heroVoice(ctx, r.hero_id, r.reply, r.bye);
       }
       await askQuestion(ctx, r.question, r.step, r.total);

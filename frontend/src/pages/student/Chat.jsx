@@ -253,7 +253,6 @@ export default function StudentChat() {
           </div>
         </form>
       )}
-      <p className="small muted center" style={{ margin: 0 }}>🔒 Javoblaringni faqat ustozing ko'radi</p>
     </div>
   );
 }
